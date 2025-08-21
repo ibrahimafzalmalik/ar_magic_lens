@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "266568489457",
+    "project_id": "ar-magic-lens-bd20a",
+    "storage_bucket": "ar-magic-lens-bd20a.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:266568489457:android:77b5ad7408081db7dd0c50",
+        "android_client_info": {
+          "package_name": "com.example.magic_lens"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwNmv73-KQmhEkStQKT7H-Rs_VFJhDO2c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
