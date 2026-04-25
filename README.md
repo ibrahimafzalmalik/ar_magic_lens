@@ -1,4 +1,5 @@
 # AR Magic Lens 🔍✨
+# AR Magic Lens 🔍✨
 
 An innovative educational Flutter application that uses Augmented Reality to help children learn object names and pronunciation through interactive real-time object detection.
 

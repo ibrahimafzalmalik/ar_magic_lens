@@ -18,6 +18,42 @@ allprojects {
         google()
         mavenCentral()
     }
+    
+    // Configure Java toolchain to use Java 17 for compilation (avoids jlink issues)
+    tasks.withType(JavaCompile).configureEach {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+        options.compilerArgs += ['-Xlint:-options']
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                compileSdkVersion 34
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_11
+                    targetCompatibility JavaVersion.VERSION_11
+                }
+            }
+        }
+        
+        // Completely disable androidJdkImage configuration to prevent jlink errors
+        project.configurations.all { configuration ->
+            if (configuration.name == 'androidJdkImage') {
+                configuration.canBeResolved = false
+                configuration.canBeConsumed = false
+            }
+        }
+        
+        // Disable all jlink-related tasks
+        project.tasks.all { task ->
+            if (task.name.contains('jlink') || task.name.contains('JdkImage') || task.name.contains('JdkImageTransform')) {
+                task.enabled = false
+            }
+        }
+    }
 }
 
 rootProject.buildDir = "../build"

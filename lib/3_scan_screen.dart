@@ -127,6 +127,12 @@ class ScanController extends GetxController {
 
     isInterpreterBusy.value = false;
   }
+  
+  // Method to get latest detected object for AR placement
+  BoundingBox? getLatestDetection() {
+    if (boundingBoxes.isEmpty) return null;
+    return boundingBoxes.first;
+  }
 
   void stopCamera() {
     if (cameraController.value.isStreamingImages) {

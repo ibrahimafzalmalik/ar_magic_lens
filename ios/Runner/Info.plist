@@ -48,8 +48,8 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Photo Library Usage</string>
 		<key>NSCameraUsageDescription</key>
-    	<string>Camera Usage</string>
-    		<key>NSMicrophoneUsageDescription</key>
-        	<string>Microphone Usage</string>
+    	<string>Camera access is required for AR object detection and learning</string>
+	<key>NSMicrophoneUsageDescription</key>
+    	<string>Microphone access may be needed for AR spatial audio</string>
 </dict>
 </plist>

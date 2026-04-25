@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'dart:io';
 import '3_scan_screen.dart';
+import '3_scan_screen_ar.dart';
 import '4_track_progress_screen.dart';
 import '5_parental_control_screen.dart';
 import 'main.dart';
@@ -192,7 +193,7 @@ class HomeScreenState extends State<HomeScreen> {
                       highlightColor: Colors.transparent,
                       borderRadius: BorderRadius.circular(30.r),
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => ScanScreen()));
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => ARScanScreen()));
                         print('You Tapped Scan Objects');
                       },
                       child: Column(

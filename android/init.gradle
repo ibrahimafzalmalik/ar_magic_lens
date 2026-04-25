@@ -1,0 +1,38 @@
+// Gradle init script to bypass jlink issues with Java 21
+initscript {
+    repositories {
+        gradlePluginPortal()
+    }
+}
+
+allprojects {
+    afterEvaluate { project ->
+        // Disable jlink transformation by providing a dummy implementation
+        project.configurations.all { config ->
+            if (config.name.contains('androidJdkImage')) {
+                config.incoming.beforeResolve {
+                    // Create a dummy file to satisfy the dependency
+                    def dummyFile = new File(project.buildDir, "dummy-jdk-image.jar")
+                    if (!dummyFile.exists()) {
+                        dummyFile.parentFile.mkdirs()
+                        dummyFile.createNewFile()
+                    }
+                }
+            }
+        }
+        
+        // Skip all jlink-related tasks
+        project.tasks.all { task ->
+            if (task.name.contains('jlink') || 
+                task.name.contains('JdkImage') || 
+                task.name.contains('androidJdkImage')) {
+                task.enabled = false
+                task.doFirst {
+                    // Do nothing
+                }
+            }
+        }
+    }
+}
+
+

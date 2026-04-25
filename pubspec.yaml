@@ -65,6 +65,9 @@ dev_dependencies:
   flutter_tflite: ^1.0.1
   flutter_tts: ^3.2.0
   flutter_local_notifications: ^10.0.0
+  # AR packages - Commented out due to compatibility issues with current Gradle/Kotlin versions
+  # arcore_flutter_plugin: ^0.1.0
+  vector_math: ^2.1.4
 #  flutter_tts: ^4.0.2
 #  flutter_inappwebview: ^6.0.0
 #  cached_network_image: ^3.3.1
