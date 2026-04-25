@@ -116,8 +116,17 @@ class ScanController extends GetxController {
           }
         }).where((box) => box != null).toList().cast<BoundingBox>();
 
-        // Save detected objects to shared state
-        TrackProgressData.addDetectedObjects(boundingBoxes.map((box) => box.label).toList());
+        if (boundingBoxes.length > 15) {
+          boundingBoxes.removeRange(15, boundingBoxes.length);
+        }
+
+        // Save new labels only (avoids flooding progress list every inference frame).
+        final labels = boundingBoxes.map((box) => box.label).toList();
+        final existing = TrackProgressData.detectedObjects.toSet();
+        final newLabels = labels.where((l) => !existing.contains(l)).toList();
+        if (newLabels.isNotEmpty) {
+          TrackProgressData.addDetectedObjects(newLabels);
+        }
       } else {
         print("No detections found or detector result is null");
       }

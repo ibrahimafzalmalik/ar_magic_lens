@@ -37,6 +37,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
 
   // Keep reference to existing scan controller for 2D mode
   ScanController? scanController;
+  StreamSubscription<String>? _placedSub;
 
   @override
   void initState() {
@@ -49,10 +50,14 @@ class _ARScanScreenState extends State<ARScanScreen> {
     );
 
     // Listen to AR object placement events
-    arService.onObjectPlaced.listen((objectName) {
+    _placedSub = arService.onObjectPlaced.listen((objectName) {
       if (mounted) {
         setState(() {
-          arStatusMessage = 'Placed: ${_pendingPlacementObject ?? objectName}';
+          final label = _pendingPlacementObject ?? objectName;
+          final base = 'Placed: $label';
+          arStatusMessage = arService.placedNodes.length >= ARService.maxPlacedObjects
+              ? '$base (keeping last ${ARService.maxPlacedObjects} placements)'
+              : base;
         });
       }
     });
@@ -60,6 +65,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
 
   @override
   void dispose() {
+    _placedSub?.cancel();
     _detectionPollTimer?.cancel();
     _arInitTimeoutTimer?.cancel();
     arService.dispose();
@@ -85,6 +91,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
     _arInitTimeoutTimer?.cancel();
     _arInitTimeoutTimer = Timer(const Duration(seconds: 10), () {
       if (!mounted || !isARMode || isARInitialized) return;
+      arService.pauseARSession();
       setState(() {
         isARMode = false;
         arStatusMessage = 'AR initialization timed out. Switched to 2D mode.';
@@ -119,6 +126,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
       }
     }).catchError((error) {
       if (mounted) {
+        arService.pauseARSession();
         setState(() {
           isARMode = false;
           arStatusMessage = 'AR Error: $error';
@@ -227,7 +235,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
         _startArInitTimeout();
       } else {
         _arInitTimeoutTimer?.cancel();
-        arService.removeAllObjects();
+        arService.pauseARSession();
         arStatusMessage = 'Switched to 2D mode';
         _pendingPlacementObject = null;
         // Restart 2D camera when switching back

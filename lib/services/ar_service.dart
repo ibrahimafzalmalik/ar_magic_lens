@@ -12,6 +12,9 @@ import 'package:flutter/foundation.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
 
 class ARService {
+  /// Upper bound on simultaneous anchors/nodes to limit memory and GPU load.
+  static const int maxPlacedObjects = 12;
+
   ARSessionManager? arSessionManager;
   ARObjectManager? arObjectManager;
   ARAnchorManager? arAnchorManager;
@@ -21,6 +24,8 @@ class ARService {
 
   final Map<String, ARPlaneAnchor> placedAnchors = {};
   final Map<String, ARNode> placedNodes = {};
+  final List<String> _placementOrder = [];
+  bool _streamsClosed = false;
 
   final StreamController<String> _onObjectPlacedController =
       StreamController<String>.broadcast();
@@ -82,10 +87,18 @@ class ARService {
 
     placedAnchors[objectName] = anchor;
     placedNodes[objectName] = node;
+    _placementOrder.add(objectName);
+
+    while (placedNodes.length > maxPlacedObjects) {
+      final oldest = _placementOrder.first;
+      removeObject(oldest);
+    }
+
     _onObjectPlacedController.add(objectName);
   }
 
   void removeObject(String objectName) {
+    _placementOrder.remove(objectName);
     final node = placedNodes.remove(objectName);
     final anchor = placedAnchors.remove(objectName);
 
@@ -104,6 +117,19 @@ class ARService {
     for (final name in objectNames) {
       removeObject(name);
     }
+    _placementOrder.clear();
+  }
+
+  /// Stops AR session and clears scene, but keeps Dart-side streams usable
+  /// so the same [ARService] can re-enter AR after toggling 2D/AR.
+  void pauseARSession() {
+    removeAllObjects();
+    arSessionManager?.dispose();
+    arSessionManager = null;
+    arObjectManager = null;
+    arAnchorManager = null;
+    isARInitialized = false;
+    isPlaneDetectionEnabled = false;
   }
 
   static Future<bool> isARSupported() async {
@@ -112,14 +138,11 @@ class ARService {
   }
 
   void dispose() {
-    removeAllObjects();
-    arSessionManager?.dispose();
-    arSessionManager = null;
-    arObjectManager = null;
-    arAnchorManager = null;
-    isARInitialized = false;
-    isPlaneDetectionEnabled = false;
-    _onObjectPlacedController.close();
-    _onObjectRemovedController.close();
+    pauseARSession();
+    if (!_streamsClosed) {
+      _onObjectPlacedController.close();
+      _onObjectRemovedController.close();
+      _streamsClosed = true;
+    }
   }
 }
