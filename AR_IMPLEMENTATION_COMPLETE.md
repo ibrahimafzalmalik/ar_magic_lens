@@ -1,5 +1,7 @@
 # AR Implementation Complete! 🎉
 
+> **Note (Day 7):** This document describes an earlier `arcore_flutter_plugin` approach. The app now ships AR via **`ar_flutter_plugin`** with the dual-mode flow in `lib/3_scan_screen_ar.dart`. For an accurate summary, read [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [README.md](README.md).
+
 ## ✅ What Has Been Implemented
 
 ### 1. **AR Packages Added**

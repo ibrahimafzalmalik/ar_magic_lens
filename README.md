@@ -1,5 +1,4 @@
 # AR Magic Lens 🔍✨
-# AR Magic Lens 🔍✨
 
 An innovative educational Flutter application that uses Augmented Reality to help children learn object names and pronunciation through interactive real-time object detection.
 
@@ -53,6 +52,12 @@ AR Magic Lens is a Final Year Project (FYP) in Software Engineering at NUML, des
 - **Camera Plugin**: Access to device camera
 - **Flutter TTS**: Text-to-speech functionality
 - **Permission Handler**: Device permissions management
+
+### Augmented reality
+- **ar_flutter_plugin**: Cross-platform AR view, plane detection, and anchored 3D nodes (Android ARCore / iOS ARKit)
+- **Scan flow**: `lib/2_home_screen.dart` opens `ARScanScreen` (`lib/3_scan_screen_ar.dart`) with a **2D / AR** toggle; 2D uses TensorFlow Lite overlays, AR uses plane taps to place a demo GLB (remote URL by default—requires network unless you point `ARService.placeModelAtHit` to a bundled asset)
+
+See [REGRESSION_CHECKLIST.md](REGRESSION_CHECKLIST.md) for pre-release manual tests.
 
 ### State Management & Navigation
 - **GetX**: State management and dependency injection
@@ -134,6 +139,12 @@ flutter run -d [device-id]
 3. **Learn Pronunciation**: Tap on detected object names to hear pronunciation
 4. **Track Progress**: View your learning progress in the tracking screen
 
+### AR mode (from Scan screen)
+1. Stay in **2D** until the app shows a detection you care about.
+2. Turn **AR** on; the 2D camera pauses and the AR view opens.
+3. When the status says the object is ready, **tap a detected plane** to place the 3D model at that hit.
+4. Turn **AR** off to return to 2D scanning. Placements are cleared when leaving AR mode.
+
 ### Best Practices
 - Use the app in well-lit environments for better object detection
 - Hold the device steady when scanning objects
@@ -156,7 +167,9 @@ lib/
 ├── main.dart                    # App entry point
 ├── 0_splash_screen.dart        # Splash screen
 ├── 2_home_screen.dart          # Home screen
-├── 3_scan_screen.dart          # AR scanning functionality
+├── 3_scan_screen.dart          # 2D object detection (camera + TFLite)
+├── 3_scan_screen_ar.dart       # Dual 2D / AR scan screen
+├── services/ar_service.dart    # AR session helpers (ar_flutter_plugin)
 ├── 4_track_progress_screen.dart # Progress tracking
 ├── 5_parental_control_screen.dart # Parental controls
 ├── 7_forgot_password_screen.dart # Password recovery
@@ -196,6 +209,8 @@ We welcome contributions to improve AR Magic Lens! Here's how you can help:
 - **Camera Permission Denied**: Ensure camera permissions are granted in device settings
 - **Object Detection Accuracy**: Works best in good lighting conditions
 - **Firebase Connection**: Check internet connection for authentication features
+- **AR model not appearing**: Default placement uses a remote GLB URL; ensure Wi‑Fi or mobile data, or bundle a model and pass `modelUrl` in code
+- **Android build or plugin Gradle errors**: If you clean the pub cache, you may need to re-apply any local compatibility patches to third-party plugin `android/build.gradle` files, or vendor the plugin in this repository for CI reproducibility
 
 ### Performance Tips
 - Close other camera-using apps before launching AR Magic Lens

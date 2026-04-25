@@ -466,8 +466,8 @@ class _ARScanScreenState extends State<ARScanScreen> {
           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
           child: Text(
             isARMode
-                ? 'Point camera at surfaces. Objects will appear in AR space.'
-                : 'Point camera at objects to detect them.',
+                ? 'Move the device to find planes, then tap a plane to place the 3D marker.'
+                : 'Point the camera at objects. When you see a label, you can switch to AR and tap a plane.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
