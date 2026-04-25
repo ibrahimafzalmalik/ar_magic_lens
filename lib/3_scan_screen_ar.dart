@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-// AR package temporarily disabled due to compatibility issues
-// import 'package:arcore_flutter_plugin/arcore_flutter_plugin.dart';
+import 'package:ar_flutter_plugin/ar_flutter_plugin.dart';
+import 'package:ar_flutter_plugin/datatypes/config_planedetection.dart';
+import 'package:ar_flutter_plugin/managers/ar_anchor_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_location_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_object_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_session_manager.dart';
+import 'package:ar_flutter_plugin/models/ar_hittest_result.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:flutter_tflite/flutter_tflite.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:vector_math/vector_math_64.dart' as vector;
 import 'services/ar_service.dart';
 import 'models/bounding_box.dart';
 import '3_scan_screen.dart'; // Import existing scan screen for 2D mode
@@ -21,13 +23,10 @@ class ARScanScreen extends StatefulWidget {
 
 class _ARScanScreenState extends State<ARScanScreen> {
   late ARService arService;
-  // AR temporarily disabled
-  // ArCoreController? arCoreController;
-  dynamic arCoreController;
-  bool isARMode = false; // Start with 2D mode, user can toggle (AR disabled)
+  bool isARMode = false; // Start with 2D mode, user can toggle.
   bool isARInitialized = false;
   String? lastDetectedObject;
-  String? arStatusMessage = 'Initializing...';
+  String? arStatusMessage = '2D mode active';
 
   // Keep reference to existing scan controller for 2D mode
   ScanController? scanController;
@@ -57,14 +56,24 @@ class _ARScanScreenState extends State<ARScanScreen> {
   }
 
   /// Handle AR view creation
-  void _onArCoreViewCreated(dynamic controller) {
-    arCoreController = controller;
-
-    arService.initializeAR(controller).then((_) {
+  void _onARViewCreated(
+    ARSessionManager sessionManager,
+    ARObjectManager objectManager,
+    ARAnchorManager anchorManager,
+    ARLocationManager locationManager,
+  ) {
+    arService
+        .initializeAR(
+      sessionManager: sessionManager,
+      objectManager: objectManager,
+      anchorManager: anchorManager,
+    )
+        .then((_) {
+      sessionManager.onPlaneOrPointTap = _onPlaneTap;
       if (mounted) {
         setState(() {
           isARInitialized = true;
-          arStatusMessage = 'AR Ready - Point camera at surfaces';
+          arStatusMessage = 'AR Ready - detect in 2D, then tap plane';
         });
       }
     }).catchError((error) {
@@ -78,27 +87,15 @@ class _ARScanScreenState extends State<ARScanScreen> {
   }
 
   /// Handle plane tap (for manual object placement)
-  void _onPlaneTap(dynamic hits) {
-    if (hits == null ||
-        (hits is List && hits.isEmpty) ||
-        lastDetectedObject == null) return;
+  void _onPlaneTap(List<ARHitTestResult> hits) {
+    if (hits.isEmpty || lastDetectedObject == null) return;
 
     try {
-      final hit = hits is List ? hits.first : hits;
-
-      // Place object at tap location
-      final shape = ARService.createColoredSphere(
-        objectLabel: lastDetectedObject!,
-        radius: 0.15,
+      final hit = hits.first;
+      arService.placeModelAtHit(
+        hitTestResult: hit,
+        objectName: lastDetectedObject!,
       );
-
-      if (shape != null) {
-        arService.placeShapeAtHit(
-          hitTestResult: hit,
-          objectName: lastDetectedObject!,
-          shape: shape,
-        );
-      }
     } catch (e) {
       print('Error handling plane tap: $e');
     }
@@ -107,43 +104,12 @@ class _ARScanScreenState extends State<ARScanScreen> {
   /// Place object at detected location (from TensorFlow Lite)
   /// This is called when an object is detected in 2D mode and user wants to place it in AR
   Future<void> placeObjectAtDetection(BoundingBox box) async {
-    if (!isARMode || arCoreController == null || !isARInitialized) return;
-
-    try {
-      // Convert 2D screen coordinates to 3D world coordinates
-      final screenPoint = vector.Vector2(
-        box.x * MediaQuery.of(context).size.width,
-        box.y * MediaQuery.of(context).size.height,
-      );
-
-      // Perform hit test
-      final shape = ARService.createColoredSphere(
-        objectLabel: box.label,
-        radius: 0.1,
-      );
-
-      if (shape == null) {
-        print('Could not create AR shape');
-        return;
-      }
-
-      final success = await arService.placeObjectAtScreenPoint(
-        objectName: '${box.label}_${DateTime.now().millisecondsSinceEpoch}',
-        screenPoint: screenPoint,
-        shape: shape,
-      );
-
-      if (success) {
-        setState(() {
-          lastDetectedObject = box.label;
-        });
-
-        // Save detected objects to progress tracking
-        TrackProgressData.addDetectedObjects([box.label]);
-      }
-    } catch (e) {
-      print('Error placing object in AR: $e');
-    }
+    if (!isARMode || !isARInitialized) return;
+    setState(() {
+      lastDetectedObject = box.label;
+      arStatusMessage = 'Tap on detected plane to place: ${box.label}';
+    });
+    TrackProgressData.addDetectedObjects([box.label]);
   }
 
   /// Handle object detection from 2D mode and place in AR when switching modes
@@ -211,19 +177,15 @@ class _ARScanScreenState extends State<ARScanScreen> {
 
   /// Build main view (AR or 2D camera)
   Widget _buildMainView() {
-    // AR Mode temporarily disabled - always use 2D mode
-    // if (isARMode) {
-    //   // AR Mode - ARCore handles its own camera
-    //   return ArCoreView(
-    //     onArCoreViewCreated: _onArCoreViewCreated,
-    //     enableTapRecognizer: true,
-    //     enableUpdateListener: true,
-    //     type: ArCoreViewType.STANDARDVIEW,
-    //   );
-    // } else {
-    // 2D Mode - Use existing scan screen implementation
-    return _build2DCameraView();
-    // }
+    if (isARMode) {
+      return ARView(
+        onARViewCreated: _onARViewCreated,
+        planeDetectionConfig: PlaneDetectionConfig.horizontalAndVertical,
+      );
+    } else {
+      // 2D Mode - Use existing scan screen implementation.
+      return _build2DCameraView();
+    }
   }
 
   /// Build 2D camera view (existing implementation)
