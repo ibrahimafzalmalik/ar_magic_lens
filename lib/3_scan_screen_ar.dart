@@ -26,11 +26,13 @@ class ARScanScreen extends StatefulWidget {
 class _ARScanScreenState extends State<ARScanScreen> {
   late ARService arService;
   bool isARMode = false; // Start with 2D mode, user can toggle.
+  bool _isArSupported = true;
   bool isARInitialized = false;
   String? lastDetectedObject;
   String? _pendingPlacementObject;
   DateTime _lastPlacementTime = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _detectionPollTimer;
+  Timer? _arInitTimeoutTimer;
   String? arStatusMessage = '2D mode active';
 
   // Keep reference to existing scan controller for 2D mode
@@ -40,6 +42,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
   void initState() {
     super.initState();
     arService = ARService();
+    _checkArSupport();
     _detectionPollTimer = Timer.periodic(
       const Duration(milliseconds: 600),
       (_) => _captureLatestDetection(),
@@ -58,11 +61,38 @@ class _ARScanScreenState extends State<ARScanScreen> {
   @override
   void dispose() {
     _detectionPollTimer?.cancel();
+    _arInitTimeoutTimer?.cancel();
     arService.dispose();
     if (scanController != null) {
       scanController!.stopCamera();
     }
     super.dispose();
+  }
+
+  Future<void> _checkArSupport() async {
+    final supported = await ARService.isARSupported();
+    if (!mounted) return;
+    setState(() {
+      _isArSupported = supported;
+      if (!supported) {
+        isARMode = false;
+        arStatusMessage = 'AR is not supported on this device. 2D mode active.';
+      }
+    });
+  }
+
+  void _startArInitTimeout() {
+    _arInitTimeoutTimer?.cancel();
+    _arInitTimeoutTimer = Timer(const Duration(seconds: 10), () {
+      if (!mounted || !isARMode || isARInitialized) return;
+      setState(() {
+        isARMode = false;
+        arStatusMessage = 'AR initialization timed out. Switched to 2D mode.';
+      });
+      if (scanController != null && !scanController!.isCameraInitialized.value) {
+        scanController!.initCamera();
+      }
+    });
   }
 
   /// Handle AR view creation
@@ -79,6 +109,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
       anchorManager: anchorManager,
     )
         .then((_) {
+      _arInitTimeoutTimer?.cancel();
       sessionManager.onPlaneOrPointTap = _onPlaneTap;
       if (mounted) {
         setState(() {
@@ -89,9 +120,14 @@ class _ARScanScreenState extends State<ARScanScreen> {
     }).catchError((error) {
       if (mounted) {
         setState(() {
+          isARMode = false;
           arStatusMessage = 'AR Error: $error';
           isARInitialized = false;
         });
+        if (scanController != null &&
+            !scanController!.isCameraInitialized.value) {
+          scanController!.initCamera();
+        }
       }
     });
   }
@@ -160,9 +196,23 @@ class _ARScanScreenState extends State<ARScanScreen> {
   }
 
   /// Toggle between AR and 2D mode
-  void _toggleARMode(bool value) {
+  Future<void> _toggleARMode(bool value) async {
+    if (value) {
+      final supported = await ARService.isARSupported();
+      if (!mounted) return;
+      if (!supported) {
+        setState(() {
+          _isArSupported = false;
+          isARMode = false;
+          arStatusMessage = 'AR unavailable on this device. Continuing in 2D.';
+        });
+        return;
+      }
+    }
+
     setState(() {
       isARMode = value;
+      isARInitialized = false;
       if (value) {
         arStatusMessage = 'Switching to AR mode...';
         _pendingPlacementObject = null;
@@ -174,7 +224,9 @@ class _ARScanScreenState extends State<ARScanScreen> {
         Future.delayed(Duration(seconds: 1), () {
           _handleObjectDetectionForAR();
         });
+        _startArInitTimeout();
       } else {
+        _arInitTimeoutTimer?.cancel();
         arService.removeAllObjects();
         arStatusMessage = 'Switched to 2D mode';
         _pendingPlacementObject = null;
@@ -345,7 +397,9 @@ class _ARScanScreenState extends State<ARScanScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isARMode ? 'AR Mode' : '2D Mode',
+                    isARMode
+                        ? 'AR Mode'
+                        : (_isArSupported ? '2D Mode' : '2D Mode (AR Unavailable)'),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18.sp,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:ar_flutter_plugin/datatypes/node_types.dart';
 import 'package:ar_flutter_plugin/managers/ar_anchor_manager.dart';
@@ -7,6 +8,7 @@ import 'package:ar_flutter_plugin/managers/ar_session_manager.dart';
 import 'package:ar_flutter_plugin/models/ar_anchor.dart';
 import 'package:ar_flutter_plugin/models/ar_hittest_result.dart';
 import 'package:ar_flutter_plugin/models/ar_node.dart';
+import 'package:flutter/foundation.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
 
 class ARService {
@@ -104,7 +106,10 @@ class ARService {
     }
   }
 
-  static Future<bool> isARSupported() async => true;
+  static Future<bool> isARSupported() async {
+    if (kIsWeb) return false;
+    return Platform.isAndroid || Platform.isIOS;
+  }
 
   void dispose() {
     removeAllObjects();
