@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:ar_flutter_plugin/ar_flutter_plugin.dart';
 import 'package:ar_flutter_plugin/datatypes/config_planedetection.dart';
@@ -26,6 +28,9 @@ class _ARScanScreenState extends State<ARScanScreen> {
   bool isARMode = false; // Start with 2D mode, user can toggle.
   bool isARInitialized = false;
   String? lastDetectedObject;
+  String? _pendingPlacementObject;
+  DateTime _lastPlacementTime = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _detectionPollTimer;
   String? arStatusMessage = '2D mode active';
 
   // Keep reference to existing scan controller for 2D mode
@@ -35,12 +40,16 @@ class _ARScanScreenState extends State<ARScanScreen> {
   void initState() {
     super.initState();
     arService = ARService();
+    _detectionPollTimer = Timer.periodic(
+      const Duration(milliseconds: 600),
+      (_) => _captureLatestDetection(),
+    );
 
     // Listen to AR object placement events
     arService.onObjectPlaced.listen((objectName) {
       if (mounted) {
         setState(() {
-          lastDetectedObject = objectName;
+          arStatusMessage = 'Placed: ${_pendingPlacementObject ?? objectName}';
         });
       }
     });
@@ -48,6 +57,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
 
   @override
   void dispose() {
+    _detectionPollTimer?.cancel();
     arService.dispose();
     if (scanController != null) {
       scanController!.stopCamera();
@@ -88,14 +98,22 @@ class _ARScanScreenState extends State<ARScanScreen> {
 
   /// Handle plane tap (for manual object placement)
   void _onPlaneTap(List<ARHitTestResult> hits) {
-    if (hits.isEmpty || lastDetectedObject == null) return;
+    if (hits.isEmpty || _pendingPlacementObject == null) return;
+    final now = DateTime.now();
+    if (now.difference(_lastPlacementTime).inMilliseconds < 1200) return;
 
     try {
+      _lastPlacementTime = now;
       final hit = hits.first;
+      final objectName =
+          '${_pendingPlacementObject!}_${DateTime.now().millisecondsSinceEpoch}';
       arService.placeModelAtHit(
         hitTestResult: hit,
-        objectName: lastDetectedObject!,
+        objectName: objectName,
       );
+      setState(() {
+        arStatusMessage = 'Placed $_pendingPlacementObject. Tap plane to add more.';
+      });
     } catch (e) {
       print('Error handling plane tap: $e');
     }
@@ -105,23 +123,38 @@ class _ARScanScreenState extends State<ARScanScreen> {
   /// This is called when an object is detected in 2D mode and user wants to place it in AR
   Future<void> placeObjectAtDetection(BoundingBox box) async {
     if (!isARMode || !isARInitialized) return;
+    if (_pendingPlacementObject == box.label) return;
     setState(() {
       lastDetectedObject = box.label;
-      arStatusMessage = 'Tap on detected plane to place: ${box.label}';
+      _pendingPlacementObject = box.label;
+      arStatusMessage = 'Ready: ${box.label}. Tap a plane to place it.';
     });
     TrackProgressData.addDetectedObjects([box.label]);
   }
 
+  void _captureLatestDetection() {
+    if (!mounted || isARMode || scanController == null) return;
+    final latestBox = scanController!.getLatestDetection();
+    if (latestBox == null || latestBox.label == lastDetectedObject) return;
+    setState(() {
+      lastDetectedObject = latestBox.label;
+      arStatusMessage = 'Detected in 2D: ${latestBox.label}';
+    });
+  }
+
   /// Handle object detection from 2D mode and place in AR when switching modes
   void _handleObjectDetectionForAR() {
-    if (!isARMode || scanController == null) return;
+    if (!isARMode) return;
 
-    // Get latest detection from scan controller
-    final latestBox = scanController!.getLatestDetection();
-    if (latestBox != null) {
+    // If camera was stopped for AR, use the latest known detection label.
+    if (lastDetectedObject != null) {
       // Small delay to ensure AR is ready
       Future.delayed(Duration(milliseconds: 500), () {
-        placeObjectAtDetection(latestBox);
+        if (!mounted || !isARInitialized || lastDetectedObject == null) return;
+        setState(() {
+          _pendingPlacementObject = lastDetectedObject;
+          arStatusMessage = 'Ready: $lastDetectedObject. Tap a plane to place it.';
+        });
       });
     }
   }
@@ -132,6 +165,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
       isARMode = value;
       if (value) {
         arStatusMessage = 'Switching to AR mode...';
+        _pendingPlacementObject = null;
         // Stop 2D camera when switching to AR
         if (scanController != null) {
           scanController!.stopCamera();
@@ -143,6 +177,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
       } else {
         arService.removeAllObjects();
         arStatusMessage = 'Switched to 2D mode';
+        _pendingPlacementObject = null;
         // Restart 2D camera when switching back
         if (scanController != null &&
             !scanController!.isCameraInitialized.value) {
