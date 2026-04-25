@@ -1,5 +1,5 @@
 buildscript{
-    ext.kotlin_version='1.7.1'
+    ext.kotlin_version='1.9.22'
     repositories {
         google()
         mavenCentral()
@@ -32,25 +32,31 @@ subprojects {
         if (project.hasProperty('android')) {
             project.android {
                 compileSdkVersion 34
+                // AGP 8+ requires namespace; backfill for legacy plugins.
+                if (namespace == null || namespace.toString().trim().isEmpty()) {
+                    def manifestFile = project.file("src/main/AndroidManifest.xml")
+                    if (manifestFile.exists()) {
+                        def manifestText = manifestFile.getText('UTF-8')
+                        def packageMatcher = manifestText =~ /package\s*=\s*"([^"]+)"/
+                        if (packageMatcher.find()) {
+                            namespace = packageMatcher.group(1)
+                        }
+                    }
+                }
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_11
                     targetCompatibility JavaVersion.VERSION_11
                 }
+                if (hasProperty("kotlinOptions")) {
+                    kotlinOptions {
+                        jvmTarget = "11"
+                    }
+                }
             }
         }
-        
-        // Completely disable androidJdkImage configuration to prevent jlink errors
-        project.configurations.all { configuration ->
-            if (configuration.name == 'androidJdkImage') {
-                configuration.canBeResolved = false
-                configuration.canBeConsumed = false
-            }
-        }
-        
-        // Disable all jlink-related tasks
-        project.tasks.all { task ->
-            if (task.name.contains('jlink') || task.name.contains('JdkImage') || task.name.contains('JdkImageTransform')) {
-                task.enabled = false
+        project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "11"
             }
         }
     }

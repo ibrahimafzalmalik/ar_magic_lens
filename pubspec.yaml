@@ -53,7 +53,7 @@ dependencies:
   image: ^3.3.0
   flutter_tflite: ^1.0.1
   flutter_tts: ^3.2.0
-  flutter_local_notifications: ^10.0.0
+  flutter_local_notifications: ^19.5.0
   vector_math: ^2.1.4
 
 dev_dependencies:
